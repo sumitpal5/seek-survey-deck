@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seek — Customer Sentiment Progression EP3→EP5</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 40px 32px;
+  }
+  .header { text-align: center; margin-bottom: 40px; }
+  .header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em; color: #f8fafc; margin-bottom: 8px; }
+  .header p  { color: #64748b; font-size: 0.9rem; }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    max-width: 1200px;
+    margin: 0 auto 24px;
+  }
+  .kpi {
+    background: #1a1f2e;
+    border: 1px solid #1e293b;
+    border-radius: 16px;
+    padding: 22px 26px;
+  }
+  .ep-label {
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .kpi.ep3 .ep-label { color: #e6a020; }
+  .kpi.ep4 .ep-label { color: #60a5fa; }
+  .kpi.ep5 .ep-label { color: #34d399; }
+  .treatment-name { font-size: 0.78rem; color: #94a3b8; margin-bottom: 10px; }
+  .kpi-flex { display: flex; gap: 24px; }
+  .kpi-stat .val { font-size: 1.75rem; font-weight: 700; line-height: 1; color: #f8fafc; }
+  .kpi-stat .lbl { font-size: 0.68rem; color: #475569; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 3px; }
+  .arrow-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 0.78rem; font-weight: 600; padding: 3px 10px;
+    border-radius: 999px; margin-top: 10px;
+  }
+  .arrow-badge.up   { background: rgba(52,211,153,0.12); color: #34d399; }
+  .arrow-badge.down { background: rgba(248,113,113,0.12); color: #f87171; }
+
+  .card {
+    background: #1a1f2e;
+    border: 1px solid #1e293b;
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 1200px;
+    margin: 0 auto 24px;
+  }
+  .card h2 {
+    font-size: 0.8rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: #64748b; margin-bottom: 24px;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  thead th {
+    text-align: left; padding: 10px 14px;
+    font-size: 0.72rem; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: #475569; border-bottom: 1px solid #1e293b;
+  }
+  tbody tr { border-bottom: 1px solid #1e293b; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 11px 14px; color: #cbd5e1; }
+  .ep-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+  .ep3-pill { background: rgba(230,160,32,0.15);  color: #e6a020; }
+  .ep4-pill { background: rgba(96,165,250,0.15);  color: #60a5fa; }
+  .ep5-pill { background: rgba(52,211,153,0.15);  color: #34d399; }
+  .bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .bar-bg { flex: 1; height: 8px; background: #1e293b; border-radius: 99px; overflow: hidden; min-width: 120px; }
+  .bar-fill { height: 100%; border-radius: 99px; }
+  .pct-val { font-size: 0.85rem; font-weight: 600; min-width: 42px; text-align: right; }
+  .votes { color: #475569; }
+
+  /* Changes section */
+  .changes-card { }
+  .changes-grid {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    gap: 0 28px;
+  }
+  .divider-v { background: #1e293b; }
+  .change-col { display: flex; flex-direction: column; gap: 18px; }
+  .change-ep-label {
+    font-size: 0.75rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 999px;
+    display: inline-block;
+    margin-bottom: 4px;
+    width: fit-content;
+  }
+  .change-ep-label.ep3 { background: rgba(96,165,250,0.15); color: #60a5fa; }
+  .change-ep-label.ep5 { background: rgba(52,211,153,0.15);  color: #34d399; }
+  .change-group { }
+  .change-cat {
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: #64748b; margin-bottom: 6px;
+  }
+  .change-col ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .change-col ul li {
+    font-size: 0.875rem;
+    color: #cbd5e1;
+    padding-left: 14px;
+    position: relative;
+    line-height: 1.45;
+  }
+  .change-col ul li::before {
+    content: '·';
+    position: absolute;
+    left: 0;
+    font-size: 1.1rem;
+    line-height: 1.2;
+    color: #475569;
+  }
+  .ep3-col ul li::before { color: #60a5fa; }
+  .ep5-col ul li::before { color: #34d399; }
+
+  /* Appendix */
+  .appendix-label {
+    max-width: 1200px;
+    margin: 8px auto 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #334155;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Customer Sentiment Progression</h1>
+  <p>Thumbs-Up Rate by Treatment &nbsp;·&nbsp; EP3 → EP4 → EP5</p>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi ep3">
+    <div class="ep-label">EP3</div>
+    <div class="treatment-name">Best — RVI&amp;WL-Heuristic Ranker</div>
+    <div class="kpi-flex">
+      <div class="kpi-stat"><div class="val">21%</div><div class="lbl">Thumbs Up</div></div>
+      <div class="kpi-stat"><div class="val">33</div><div class="lbl">Votes</div></div>
+    </div>
+    <div class="arrow-badge down">Feed Only baseline: 11%</div>
+  </div>
+  <div class="kpi ep4">
+    <div class="ep-label">EP4</div>
+    <div class="treatment-name">Best — RVI&amp;WL-Heuristic Ranker</div>
+    <div class="kpi-flex">
+      <div class="kpi-stat"><div class="val">65%</div><div class="lbl">Thumbs Up</div></div>
+      <div class="kpi-stat"><div class="val">1,621</div><div class="lbl">Votes</div></div>
+    </div>
+    <div class="arrow-badge up">↑ +44 pts from EP3</div>
+  </div>
+  <div class="kpi ep5">
+    <div class="ep-label">EP5</div>
+    <div class="treatment-name">Best — RVI&amp;WL-ML Ranker</div>
+    <div class="kpi-flex">
+      <div class="kpi-stat"><div class="val">68%</div><div class="lbl">Thumbs Up</div></div>
+      <div class="kpi-stat"><div class="val">2,665</div><div class="lbl">Votes</div></div>
+    </div>
+    <div class="arrow-badge up">↑ +3 pts from EP4</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Thumbs-Up % by Treatment — All Experiment Phases</h2>
+  <div style="position:relative; height:400px;">
+    <canvas id="mainChart"></canvas>
+  </div>
+</div>
+
+<!-- Changes section -->
+<div class="card changes-card">
+  <h2>What Changed Each Phase</h2>
+  <div class="changes-grid">
+
+    <div class="change-col ep3-col">
+      <div class="change-ep-label ep3">EP3 → EP4</div>
+
+      <div class="change-group">
+        <div class="change-cat">Retrieval</div>
+        <ul>
+          <li>Removal of popularity ranker (top K) while retrieving</li>
+          <li>Removal of recency filters</li>
+          <li>Smarter aspect choice based on aspect weights</li>
+        </ul>
+      </div>
+
+      <div class="change-group">
+        <div class="change-cat">Ranking</div>
+        <ul>
+          <li>Introduction to ML ranker, trained with previous EP data</li>
+          <li>Heuristic ranker improvements to make it more personalised</li>
+          <li>Moving to contextual first round ranker</li>
+        </ul>
+      </div>
+
+      <div class="change-group">
+        <div class="change-cat">Others</div>
+        <ul>
+          <li>Freshness solves — randomisation in top results, longer living cache</li>
+          <li>Multi blender approach to ensure better diversity</li>
+          <li>Purchase suppression</li>
+        </ul>
+      </div>
+
+      <div class="change-group">
+        <div class="change-cat">Experience</div>
+        <ul>
+          <li>Introduction of condensed RVI and Watchlist</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="divider-v"></div>
+
+    <div class="change-col ep5-col">
+      <div class="change-ep-label ep5">EP4 → EP5</div>
+
+      <div class="change-group">
+        <div class="change-cat">Retrieval</div>
+        <ul>
+          <li>Removal of C2C filter, MSKU filter</li>
+        </ul>
+      </div>
+
+      <div class="change-group">
+        <div class="change-cat">Ranking</div>
+        <ul>
+          <li>Removal of external boosting of C2C and recent items in ML ranker</li>
+          <li>ML ranker latency optimisation to reduce API failure cases</li>
+          <li>Heuristic ranker improvements</li>
+        </ul>
+      </div>
+
+      <div class="change-group">
+        <div class="change-cat">Others</div>
+        <ul>
+          <li>Indirect impact of aspect personalization in MLR</li>
+        </ul>
+      </div>
+
+      <div class="change-group">
+        <div class="change-cat">Experience</div>
+        <ul>
+          <li>Standard RVI and Watchlist used</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Appendix -->
+<div class="appendix-label">Appendix</div>
+<div class="card">
+  <h2>Full Data Table</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Phase</th><th>Treatment</th><th>Thumbs-Up Rate</th>
+        <th>Thumbs Up</th><th>Thumbs Down</th><th>Total Votes</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<script>
+// Treatments as x-axis groups; EPs as series
+// null = that EP didn't run this treatment
+const treatments = ['Feed Only', 'RVI&WL-Heuristic Ranker', 'RVI&WL-ML Ranker'];
+
+const ep3Data = [11.0,  21.2,  null];
+const ep4Data = [46.9,  64.6,  62.0];
+const ep5Data = [null,  67.5,  68.1];
+
+// Total votes per EP per treatment (same order: Feed Only, RVI&WL-Heuristic Ranker, RVI&WL-ML Ranker)
+const ep3Votes = [227,  33,   null];
+const ep4Votes = [4397, 1621, 1540];
+const ep5Votes = [null, 2790, 2665];
+
+// Raw nulls for tracking; replace with 0 in chart data so bars render
+const ep3Raw = ep3Data.slice();
+const ep4Raw = ep4Data.slice();
+const ep5Raw = ep5Data.slice();
+
+// Plugin: draw % above bar + total votes inside bar
+const barLabelsPlugin = {
+  id: 'barLabels',
+  afterDatasetsDraw(chart) {
+    const { ctx, scales: { y } } = chart;
+    const rawPct   = [ep3Raw,   ep4Raw,   ep5Raw];
+    const rawVotes = [ep3Votes, ep4Votes, ep5Votes];
+    const colors   = ['#e6a020', '#60a5fa', '#34d399'];
+
+    rawPct.forEach((epRaw, dsIdx) => {
+      const meta = chart.getDatasetMeta(dsIdx);
+      epRaw.forEach((val, i) => {
+        if (val === null) return;
+        const bar = meta.data[i];
+        if (!bar) return;
+
+        const top = y.getPixelForValue(val);
+
+        // % above bar
+        ctx.save();
+        ctx.font = 'bold 12px -apple-system, sans-serif';
+        ctx.fillStyle = '#f8fafc';
+        ctx.textAlign = 'center';
+        ctx.fillText(val.toFixed(1) + '%', bar.x, top - 6);
+        ctx.restore();
+
+        // total votes below % (slightly smaller, muted)
+        const votes = rawVotes[dsIdx][i];
+        if (votes !== null) {
+          ctx.save();
+          ctx.font = '10px -apple-system, sans-serif';
+          ctx.fillStyle = colors[dsIdx] + 'cc';
+          ctx.textAlign = 'center';
+          ctx.fillText('n=' + votes.toLocaleString(), bar.x, top - 19);
+          ctx.restore();
+        }
+      });
+    });
+  }
+};
+
+// Plugin: draw hatched placeholder where data is null
+const notRunPlugin = {
+  id: 'notRun',
+  afterDatasetsDraw(chart) {
+    const { ctx, scales: { x, y } } = chart;
+    const raw = [ep3Raw, ep4Raw, ep5Raw];
+    const colors = ['#e6a020', '#60a5fa', '#34d399'];
+    const datasets = chart.data.datasets;
+
+    raw.forEach((epRaw, dsIdx) => {
+      const meta = chart.getDatasetMeta(dsIdx);
+      epRaw.forEach((val, i) => {
+        if (val !== null) return;
+        const bar = meta.data[i];
+        if (!bar) return;
+
+        // bar geometry
+        const bw = bar.width;
+        const bx = bar.x - bw / 2;
+        const by = y.getPixelForValue(0);
+        const bh = -(by - y.getPixelForValue(15)); // fixed placeholder height ~15%
+
+        ctx.save();
+
+        // faint background
+        ctx.fillStyle = colors[dsIdx] + '18';
+        ctx.beginPath();
+        ctx.roundRect(bx, by + bh, bw, -bh, 4);
+        ctx.fill();
+
+        // diagonal stripes
+        ctx.strokeStyle = colors[dsIdx] + '40';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        const step = 7;
+        for (let s = -bh + step; s < bw + (-bh); s += step) {
+          const x1 = bx + Math.max(0, s - (-bh));
+          const y1 = by + bh + Math.max(0, (-bh) - s);
+          const x2 = bx + Math.min(bw, s);
+          const y2 = by + Math.max(0, bh + s);
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+        }
+        ctx.clip();
+        ctx.stroke();
+        ctx.restore();
+
+        // dashed border
+        ctx.save();
+        ctx.strokeStyle = colors[dsIdx] + '60';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.roundRect(bx, by + bh, bw, -bh, 4);
+        ctx.stroke();
+        ctx.restore();
+
+        // "not run" label
+        ctx.save();
+        ctx.fillStyle = colors[dsIdx] + 'aa';
+        ctx.font = '9px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('not run', bar.x, by + bh / 2 + 4);
+        ctx.restore();
+      });
+    });
+  }
+};
+
+// Replace nulls with 0 so Chart.js renders a slot for each bar
+const toZero = arr => arr.map(v => v === null ? 0 : v);
+
+new Chart(document.getElementById('mainChart'), {
+  plugins: [notRunPlugin, barLabelsPlugin],
+  type: 'bar',
+  data: {
+    labels: treatments,
+    datasets: [
+      {
+        label: 'EP3',
+        data: toZero(ep3Data),
+        backgroundColor: '#e6a020',
+        borderColor: '#e6a020',
+        borderWidth: 0,
+        borderRadius: 5,
+      },
+      {
+        label: 'EP4',
+        data: toZero(ep4Data),
+        backgroundColor: '#60a5fa',
+        borderColor: '#60a5fa',
+        borderWidth: 0,
+        borderRadius: 5,
+      },
+      {
+        label: 'EP5',
+        data: toZero(ep5Data),
+        backgroundColor: '#34d399',
+        borderColor: '#34d399',
+        borderWidth: 0,
+        borderRadius: 5,
+      },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: {
+          color: '#94a3b8',
+          font: { size: 13 },
+          padding: 24,
+          usePointStyle: true,
+          pointStyle: 'rect',
+        }
+      },
+      tooltip: {
+        backgroundColor: '#1e293b',
+        titleColor: '#f8fafc',
+        bodyColor: '#94a3b8',
+        borderColor: '#334155',
+        borderWidth: 1,
+        callbacks: {
+          label: ctx => {
+            const raw = [ep3Raw, ep4Raw, ep5Raw][ctx.datasetIndex][ctx.dataIndex];
+            return raw !== null
+              ? ` ${ctx.dataset.label}: ${raw.toFixed(1)}%`
+              : ` ${ctx.dataset.label}: not run`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#94a3b8', font: { size: 13 } },
+        grid: { color: '#1e293b' },
+      },
+      y: {
+        min: 0, max: 100,
+        ticks: {
+          color: '#94a3b8',
+          font: { size: 12 },
+          callback: v => v + '%',
+          stepSize: 10,
+        },
+        grid: { color: '#1e293b' },
+      }
+    }
+  }
+});
+
+// Table
+const rows = [
+  { ep:'EP3', t:'BAU',        down:2,   up:5,    total:7,    pct:71.4 },
+  { ep:'EP3', t:'Feed Only',  down:202, up:25,   total:227,  pct:11.0 },
+  { ep:'EP3', t:'RVI&WL-Heuristic Ranker',  down:26,  up:7,    total:33,   pct:21.2 },
+  { ep:'EP4', t:'BAU',        down:9,   up:31,   total:40,   pct:77.5 },
+  { ep:'EP4', t:'FeedOnly',   down:2333,up:2064, total:4397, pct:46.9 },
+  { ep:'EP4', t:'RVI&WL-Heuristic Ranker',  down:574, up:1047, total:1621, pct:64.6 },
+  { ep:'EP4', t:'RVI&WL-ML Ranker',  down:585, up:955,  total:1540, pct:62.0 },
+  { ep:'EP5', t:'BAU',        down:466, up:728,  total:1194, pct:61.0 },
+  { ep:'EP5', t:'RVI&WL-ML Ranker',  down:849, up:1816, total:2665, pct:68.1 },
+  { ep:'EP5', t:'RVI&WL-Heuristic Ranker',  down:907, up:1883, total:2790, pct:67.5 },
+];
+const pillClass = { EP3:'ep3-pill', EP4:'ep4-pill', EP5:'ep5-pill' };
+const barCol    = { EP3:'#e6a020',  EP4:'#60a5fa',  EP5:'#34d399'  };
+const tbody = document.getElementById('tableBody');
+rows.forEach(d => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><span class="ep-pill ${pillClass[d.ep]}">${d.ep}</span></td>
+    <td>${d.t}</td>
+    <td>
+      <div class="bar-wrap">
+        <div class="bar-bg"><div class="bar-fill" style="width:${d.pct}%;background:${barCol[d.ep]};"></div></div>
+        <span class="pct-val" style="color:${barCol[d.ep]}">${d.pct.toFixed(1)}%</span>
+      </div>
+    </td>
+    <td>${d.up.toLocaleString()}</td>
+    <td class="votes">${d.down.toLocaleString()}</td>
+    <td>${d.total.toLocaleString()}</td>
+  `;
+  tbody.appendChild(tr);
+});
+</script>
+</body>
+</html>
